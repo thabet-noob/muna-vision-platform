@@ -1,0 +1,53 @@
+version: "3.9"
+services:
+  dashboard:
+    build: ./services/dashboard
+    env_file: .env
+    ports: ["8050:8050"]
+    volumes:
+      - ./volumes/model_store:/app/models
+      - ./volumes/history:/app/history
+      - ./volumes/inference_data:/app/inference_data
+    depends_on:
+      - inference_api
+    restart: unless-stopped
+
+  inference_api:
+    build: ./services/inference_service
+    env_file: .env
+    ports: ["8001:8001"]
+    volumes:
+      - ./volumes/model_store:/app/models
+      - ./volumes/history:/app/history
+      - ./volumes/inference_data:/app/inference_data
+    restart: unless-stopped
+
+  monitoring_api:
+    build: ./services/monitoring_service
+    env_file: .env
+    ports: ["8002:8002"]
+    volumes:
+      - ./volumes/model_store:/app/models
+      - ./volumes/history:/app/history
+    restart: unless-stopped
+
+  trainer:
+    build: ./services/training_service
+    env_file: .env
+    volumes:
+      - ./volumes/model_store:/app/models
+      - ./volumes/history:/app/history
+    command: ["python","/app/services/training_service/train.py"]
+    restart: "no"
+
+  orchestrator:
+    build: ./services/orchestrator
+    env_file: .env
+    volumes:
+      - ./volumes/model_store:/app/models
+      - ./volumes/history:/app/history
+    depends_on:
+      - trainer
+      - inference_api
+      - monitoring_api
+    restart: unless-stopped

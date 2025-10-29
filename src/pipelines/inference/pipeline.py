@@ -1,12 +1,25 @@
-from typing import List, Tuple
+"""End-to-end inference helpers for detection, annotation and encoding."""
+
+from __future__ import annotations
+
+from typing import List, Tuple, Optional
 import numpy as np
 import cv2
 from .yolo import load_yolo
 from .color import student_by_yellow
 from .happiness import compute_happiness
 
-def detect_and_annotate(frame: np.ndarray, imgsz=640, conf=0.35, device_hint=None):
-    model, device = load_yolo()
+def detect_and_annotate(
+    frame: np.ndarray,
+    imgsz: int = 640,
+    conf: float = 0.35,
+    device_hint: Optional[str] = None,
+):
+    """Detect persons, annotate the frame, and collect head ROIs.
+
+    Returns (annotated_frame, people_count, students_count, head_rois).
+    """
+    model, device = load_yolo(device_hint=device_hint)
     res = model.predict(frame, imgsz=imgsz, conf=conf, iou=0.5, classes=[0], device=device, verbose=False)[0]
     annotated = res.plot()
     people = 0
@@ -38,10 +51,12 @@ def detect_and_annotate(frame: np.ndarray, imgsz=640, conf=0.35, device_hint=Non
                 head_rois.append(head)
     return annotated, people, students, head_rois
 
-def to_jpeg(img, size=(960,540)):
+def to_jpeg(img: np.ndarray, size: Tuple[int, int] = (960, 540)) -> Optional[str]:
+    """Encode an image as a base64 JPEG data URL; returns None on failure."""
     img = cv2.resize(img, size, interpolation=cv2.INTER_AREA)
     ok, enc = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-    if not ok: return None
+    if not ok:
+        return None
     import base64
     return "data:image/jpeg;base64," + base64.b64encode(enc).decode("utf-8")
 

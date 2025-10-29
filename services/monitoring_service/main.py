@@ -3,9 +3,11 @@ from pydantic import BaseModel
 from pathlib import Path
 import pandas as pd
 import datetime as dt
+import os
 
 app = FastAPI(title="Monitoring API")
-HISTORY = Path("/app/history")
+HISTORY_DIR = os.environ.get("HISTORY_DIR", "/app/history")
+HISTORY = Path(HISTORY_DIR)
 PRED_FILE = HISTORY / "predictions.csv"
 METRICS_FILE = HISTORY / "metrics.csv"
 HISTORY.mkdir(parents=True, exist_ok=True)
@@ -17,7 +19,7 @@ class Metrics(BaseModel):
     happiness_avg: float
 
 @app.get("/health")
-def health():
+def health() -> dict:
     return {"status":"ok"}
 
 @app.post("/ingest")

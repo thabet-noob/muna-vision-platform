@@ -1,12 +1,17 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 import numpy as np, cv2, io, os
 from src.pipelines.inference.pipeline import detect_and_annotate, compute_happiness, to_jpeg
 
 app = FastAPI(title="Inference API")
 
+# Optional runtime tuning via env vars
+IMGSZ = int(os.environ.get("IMGSZ", "640"))
+CONF = float(os.environ.get("CONF", "0.35"))
+DEVICE_HINT = os.environ.get("DEVICE_HINT")
+
 @app.get("/health")
-def health():
+def health() -> dict:
     return {"status":"ok"}
 
 class PredictResponse(BaseModel):
@@ -17,16 +22,22 @@ class PredictResponse(BaseModel):
     annotated_b64: str
 
 @app.post("/predict", response_model=PredictResponse)
-async def predict(file: UploadFile = File(...)):
+async def predict(file: UploadFile = File(...)) -> PredictResponse:
     data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file uploaded")
     img_array = np.frombuffer(data, dtype=np.uint8)
     frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-    annotated, people, students, head_rois = detect_and_annotate(frame)
+    if frame is None or frame.size == 0:
+        raise HTTPException(status_code=400, detail="Could not decode image")
+    annotated, people, students, head_rois = detect_and_annotate(
+        frame, imgsz=IMGSZ, conf=CONF, device_hint=DEVICE_HINT
+    )
     happiness = float(compute_happiness(frame, head_rois))
     return {
         "people": int(people),
         "students": int(students),
         "non_students": int(max(0, people-students)),
         "happiness": float(happiness),
-        "annotated_b64": to_jpeg(annotated),
+        "annotated_b64": to_jpeg(annotated) or "",
     }

@@ -11,6 +11,7 @@ RTSP_URL = os.environ.get("RTSP_URL", "rtsp://USER:PASS@192.168.1.207:554/live2"
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;8000000|reorder_queue_size;0|fflags;nobuffer"
 CONF  = float(os.environ.get("CONF","0.35"))
 IMGSZ = int(os.environ.get("IMGSZ","640"))
+DEVICE_HINT = os.environ.get("DEVICE_HINT")
 TICK_MS = int(os.environ.get("TICK_MS","500"))
 DISP_W, DISP_H = 960, 540
 
@@ -128,9 +129,11 @@ def update(n):
     if frame is None:
         return no_update, no_update, no_update, no_update, no_update
     try:
-        annotated, people, students, head_rois = detect_and_annotate(frame, imgsz=IMGSZ, conf=CONF)
+        annotated, people, students, head_rois = detect_and_annotate(
+            frame, imgsz=IMGSZ, conf=CONF, device_hint=DEVICE_HINT
+        )
         non_students = max(0, people - students)
-        src = to_jpeg(annotated, size=(960,540))
+        src = to_jpeg(annotated, size=(960,540)) or no_update
         h = compute_happiness(frame, head_rois) if (_tick % 2 == 0) else _happy_score
         fig = gauge_figure(h, faces_seen=people)
         return src, str(people), str(students), str(non_students), fig
